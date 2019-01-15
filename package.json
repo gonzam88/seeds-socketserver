@@ -1,0 +1,24 @@
+{
+  "name": "seeds-socketserver",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gonzam88/seeds-socketserver.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/gonzam88/seeds-socketserver/issues"
+  },
+  "homepage": "https://github.com/gonzam88/seeds-socketserver#readme",
+  "dependencies": {
+    "express": "^4.16.4",
+    "path": "^0.12.7",
+    "ws": "^6.1.2"
+  }
+}

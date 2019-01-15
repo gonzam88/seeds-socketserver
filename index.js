@@ -19,13 +19,38 @@ wss.getUniqueID = function () {
     return s4() + s4() + '-' + s4();
 };
 
-
 var playersQueue = [];
-var clientsPaneles = [];
 var clientPlotter;
+var currArtist;
 
 function heartbeat() {
-  this.isAlive = true;
+	this.isAlive = true;
+}
+
+// Chequeando la QUEUE
+wss.UpdateQueue = function(){
+	if(playersQueue > 0 && currArtist == null){
+		currArtist = playersQueue.shift();
+	}
+	// data vacia
+	var data = {
+		action 		: "queuelist",
+		players 	: [],
+		artist 		: [currArtist.nickname, currArtist.id]
+	};
+	// cargo data
+	for(let i = 0; i < playersQueue.length; i++){
+		data.players.push([
+			playersQueue[i].nickname,
+			playersQueue[i].id
+		])
+	}
+	// le mando a todos la nueva cola
+	wss.clients.forEach(function each(client) {
+		if (client.readyState === WebSocket.OPEN) {
+			client.send(data);
+		}
+	});
 }
 
 wss.on('connection', function connection(ws, req) {
@@ -46,35 +71,54 @@ wss.on('connection', function connection(ws, req) {
 				case "login":
 					ws.nickname = data.nickname;
 					ws.role = data.role;
-					if(ws.role == "panel"){
-						clientsPaneles.push(ws);
-						ws.isPanel = true;
 
-					}else if(ws.role == "plottersecreto"){
+					if(ws.role == "plottersecreto"){
 						clientPlotter = ws;
 
 					}else {
-						ws.isQueue = true;
+						ws.isDrawing = false;
 						playersQueue.push(ws);
+						wss.UpdateQueue();
+
+
 					}
 					console.log("Usr Login: " + ws.nickname);
 					break;
 
-				case "refreshPanel":
-	                wss.UpdatePaneles(ws);
-	            	break;
-
-				case "line-start":
+				case "linestart":
 					if(!clientPlotter) return;
-					// clientPlotter.send(pos)
+					if(!ws.isDrawing) return;
+					// Broadcast to everyone else.
+				    wss.clients.forEach(function each(client) {
+				      if (client !== ws && client.readyState === WebSocket.OPEN) {
+				        client.send(data);
+				      }
+				    });
 					break;
 				case "vertex":
 					if(!clientPlotter) return;
-					// clientPlotter.send(pos)
+					if(!ws.isDrawing) return;
+
+					// Broadcast to everyone else.
+				    wss.clients.forEach(function each(client) {
+				      if (client !== ws && client.readyState === WebSocket.OPEN) {
+				        client.send(data);
+				      }
+				    });
 					break;
-				case "line-end":
+				case "lineend":
 					if(!clientPlotter) return;
-					// clientPlotter.send(pos)
+					if(!ws.isDrawing) return;
+					// Broadcast to everyone else.
+				    wss.clients.forEach(function each(client) {
+				      if (client !== ws && client.readyState === WebSocket.OPEN) {
+				        client.send(data);
+				      }
+				    });
+
+					ws.isDrawing = false;
+					currArtist = null;
+					wss.UpdateQueue();
 					break;
 			}
 		}
@@ -83,12 +127,23 @@ wss.on('connection', function connection(ws, req) {
 	ws.on('close', function connection(client) {
 		switch(ws.role){
 			case "plottersecreto":
-			break;
-
-			case "panel":
+				clientPlotter = null;
 			break;
 
 			default:
+				// cliente comun
+				if(ws.isDrawing){
+					ws.isDrawing = false;
+					currArtist = null;
+				}else{
+					for(let i=0; i < playersQueue.length; i++){
+		                if(ws.id == playersQueue[i].id){
+		                    // Lo saco de la queue
+		                    playersQueue.splice(i,1);
+		                }
+					}
+				}
+				wss.UpdateQueue();
 			break;
 		}
         console.log("Conexion cerrada: " + ws.nickname);

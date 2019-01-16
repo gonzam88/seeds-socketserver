@@ -19,6 +19,7 @@
   "dependencies": {
     "express": "^4.16.4",
     "path": "^0.12.7",
+    "victor": "^1.1.0",
     "ws": "^6.1.2"
   }
 }

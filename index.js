@@ -2,6 +2,7 @@ const express = require('express');
 const WebSocket = require('ws');
 const SocketServer = WebSocket.Server;
 const path = require('path');
+var Victor = require('victor');
 
 const PORT = process.env.PORT || 3000;
 const INDEX = path.join(__dirname, 'index.html');
@@ -21,6 +22,9 @@ wss.getUniqueID = function () {
 };
 
 
+var totalInk = 10;
+var currInk;
+var artistLastPoint;
 
 var playersQueue = [];
 var clientPlotter;
@@ -34,22 +38,24 @@ function heartbeat() {
 wss.UpdateQueue = function(){
 
 	if(playersQueue.length > 0 && (currArtist == null || currArtist == undefined)){
+        // NUEVO ARTistA
 		currArtist = playersQueue.shift();
         currArtist.isDrawing = true
         currArtist.send( JSON.stringify({action: "sosartista"}) )
+        currInk = totalInk;
 	}
 	// data vacia
-	var data = {
+	let msg = {
 		action 		: "queuelist",
 		players 	: [],
 		artist 		: ""
 	};
-	// cargo data
+	// cargo msg
     if(currArtist){
-        data.artist = [currArtist.nickname, currArtist.id];
+        msg.artist = [currArtist.nickname, currArtist.id];
     }
 	for(let i = 0; i < playersQueue.length; i++){
-		data.players.push([
+		msg.players.push([
 			playersQueue[i].nickname,
 			playersQueue[i].id
 		])
@@ -57,7 +63,7 @@ wss.UpdateQueue = function(){
 	// le mando a todos la nueva cola
 	wss.clients.forEach(function each(client) {
 		if (client.readyState === WebSocket.OPEN) {
-			client.send(JSON.stringify(data));
+			client.send(JSON.stringify(msg));
 		}
 	});
 }
@@ -77,6 +83,7 @@ wss.on('connection', function connection(ws, req) {
         if(char == "[" || char == "{"){
 	        // Mensaje Json
 	        var data = JSON.parse(message);
+            let msg;
 	        // console.log("Msj Json: ");
 	        // console.log(data);
 	        switch (data.action) {
@@ -84,6 +91,13 @@ wss.on('connection', function connection(ws, req) {
 				case "login":
 					ws.nickname = data.nickname;
 					ws.role = data.role;
+                    ws.id = wss.getUniqueID();
+
+                    msg ={
+                        action: "login",
+                        id: ws.id,
+                    }
+                    ws.send(JSON.stringify(msg));
 
 					if(ws.role == "plottersecreto"){
 						clientPlotter = ws;
@@ -93,10 +107,12 @@ wss.on('connection', function connection(ws, req) {
 						playersQueue.push(ws);
 						wss.UpdateQueue();
 					}
+
 					console.log("Usr Login: " + ws.nickname + " || Host: " + ws.host);
 					break;
+
                 case "status":
-                    var msg = {
+                    msg = {
                         action: "queuelist",
                         players: [],
                         artist: ""
@@ -116,6 +132,7 @@ wss.on('connection', function connection(ws, req) {
 
 				case "linestart":
 					if(!ws.isDrawing) return;
+                    artistLastPoint = new Victor(data.x, data.y)
 					// Broadcast to everyone else.
 				    wss.clients.forEach(function each(client) {
 				      if (client !== ws && client.readyState === WebSocket.OPEN) {
@@ -126,12 +143,26 @@ wss.on('connection', function connection(ws, req) {
 				case "vertex":
 					if(!ws.isDrawing) return;
 
-					// Broadcast to everyone else.
+                    let newPoint = new Victor(data.x, data.y)
+                    let dist = artistLastPoint.distance(newPoint);
+                    currInk -= dist;
+                    artistLastPoint = newPoint;
+                    data.ink = currInk;
+
+                    // Broadcast to everyone
 				    wss.clients.forEach(function each(client) {
-				      if (client !== ws && client.readyState === WebSocket.OPEN) {
+				      if (client.readyState === WebSocket.OPEN) {
 				        client.send(JSON.stringify(data));
 				      }
 				    });
+
+                    if(currInk <= 0){
+                        console.log("A " + ws.nickname + " se le terminó la tinta")
+                        ws.isDrawing = false;
+                        currArtist = undefined;
+                        wss.UpdateQueue();
+                    }
+
 					break;
 				case "lineend":
 					if(!ws.isDrawing) return;

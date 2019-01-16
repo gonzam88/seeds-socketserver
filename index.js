@@ -1,5 +1,6 @@
 const express = require('express');
-const SocketServer = require('ws').Server;
+const WebSocket = require('ws');
+const SocketServer = WebSocket.Server;
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
@@ -19,6 +20,8 @@ wss.getUniqueID = function () {
     return s4() + s4() + '-' + s4();
 };
 
+
+
 var playersQueue = [];
 var clientPlotter;
 var currArtist;
@@ -29,16 +32,22 @@ function heartbeat() {
 
 // Chequeando la QUEUE
 wss.UpdateQueue = function(){
-	if(playersQueue > 0 && currArtist == null){
+
+	if(playersQueue.length > 0 && (currArtist == null || currArtist == undefined)){
 		currArtist = playersQueue.shift();
+        currArtist.isDrawing = true
+        currArtist.send( JSON.stringify({action: "sosartista"}) )
 	}
 	// data vacia
 	var data = {
 		action 		: "queuelist",
 		players 	: [],
-		artist 		: [currArtist.nickname, currArtist.id]
+		artist 		: ""
 	};
 	// cargo data
+    if(currArtist){
+        data.artist = [currArtist.nickname, currArtist.id];
+    }
 	for(let i = 0; i < playersQueue.length; i++){
 		data.players.push([
 			playersQueue[i].nickname,
@@ -48,7 +57,7 @@ wss.UpdateQueue = function(){
 	// le mando a todos la nueva cola
 	wss.clients.forEach(function each(client) {
 		if (client.readyState === WebSocket.OPEN) {
-			client.send(data);
+			client.send(JSON.stringify(data));
 		}
 	});
 }
@@ -56,7 +65,10 @@ wss.UpdateQueue = function(){
 wss.on('connection', function connection(ws, req) {
 	ws.id = wss.getUniqueID();
     ws.isAlive = true;
-	ws.ip = req.headers['x-forwarded-for'].split(/\s*,\s*/)[0] || req.connection.remoteAddress;
+	// ws.ip = req.headers['x-forwarded-for'].split(/\s*,\s*/)[0] || req.connection.remoteAddress;
+    var hostName = req.headers[':authority'] || req.headers.host;
+    ws.host = hostName.split(':')[0];
+
 	ws.on('pong', heartbeat);
 
 	ws.on('message', function incoming(message) {
@@ -68,6 +80,7 @@ wss.on('connection', function connection(ws, req) {
 	        // console.log("Msj Json: ");
 	        // console.log(data);
 	        switch (data.action) {
+
 				case "login":
 					ws.nickname = data.nickname;
 					ws.role = data.role;
@@ -79,79 +92,86 @@ wss.on('connection', function connection(ws, req) {
 						ws.isDrawing = false;
 						playersQueue.push(ws);
 						wss.UpdateQueue();
-
-
 					}
-					console.log("Usr Login: " + ws.nickname);
+					console.log("Usr Login: " + ws.nickname + " || Host: " + ws.host);
 					break;
+                case "status":
+                    var msg = {
+                        action: "queuelist",
+                        players: [],
+                        artist: ""
+                    }
+
+                    if(currArtist){
+                        msg.artist = [currArtist.nickname, currArtist.id];
+                    }
+                	for(let i = 0; i < playersQueue.length; i++){
+                		msg.players.push([
+                			playersQueue[i].nickname,
+                			playersQueue[i].id
+                		])
+                	}
+                    ws.send(JSON.stringify(msg));
+                    break;
 
 				case "linestart":
-					if(!clientPlotter) return;
 					if(!ws.isDrawing) return;
 					// Broadcast to everyone else.
 				    wss.clients.forEach(function each(client) {
 				      if (client !== ws && client.readyState === WebSocket.OPEN) {
-				        client.send(data);
+				        client.send(JSON.stringify(data));
 				      }
 				    });
 					break;
 				case "vertex":
-					if(!clientPlotter) return;
 					if(!ws.isDrawing) return;
 
 					// Broadcast to everyone else.
 				    wss.clients.forEach(function each(client) {
 				      if (client !== ws && client.readyState === WebSocket.OPEN) {
-				        client.send(data);
+				        client.send(JSON.stringify(data));
 				      }
 				    });
 					break;
 				case "lineend":
-					if(!clientPlotter) return;
 					if(!ws.isDrawing) return;
 					// Broadcast to everyone else.
 				    wss.clients.forEach(function each(client) {
 				      if (client !== ws && client.readyState === WebSocket.OPEN) {
-				        client.send(data);
+				        client.send(JSON.stringify(data));
 				      }
 				    });
 
-					ws.isDrawing = false;
-					currArtist = null;
-					wss.UpdateQueue();
+					// ws.isDrawing = false;
+					// currArtist = undefined;
+					// wss.UpdateQueue();
 					break;
 			}
 		}
 	});
 
 	ws.on('close', function connection(client) {
-		switch(ws.role){
-			case "plottersecreto":
-				clientPlotter = null;
-			break;
-
-			default:
-				// cliente comun
-				if(ws.isDrawing){
-					ws.isDrawing = false;
-					currArtist = null;
-				}else{
-					for(let i=0; i < playersQueue.length; i++){
-		                if(ws.id == playersQueue[i].id){
-		                    // Lo saco de la queue
-		                    playersQueue.splice(i,1);
-		                }
-					}
-				}
-				wss.UpdateQueue();
-			break;
+		// cliente comun
+		if(ws.isDrawing){
+			ws.isDrawing = false;
+			currArtist = undefined;
+		}else{
+			for(let i=0; i < playersQueue.length; i++){
+                if(ws.id == playersQueue[i].id){
+                    // Lo saco de la queue
+                    playersQueue.splice(i,1);
+                }
+			}
 		}
+		wss.UpdateQueue();
+
         console.log("Conexion cerrada: " + ws.nickname);
 	});
 });
 
 
 // Ping pong
+function noop() {}
 const interval = setInterval(function ping() {
   wss.clients.forEach(function each(ws) {
     if (ws.isAlive === false) return ws.terminate();

@@ -30,6 +30,8 @@ var playersQueue = [];
 var clientPlotter;
 var currArtist;
 
+var playersLines = [];
+
 function heartbeat() {
 	this.isAlive = true;
 }
@@ -96,6 +98,7 @@ wss.on('connection', function connection(ws, req) {
                     msg ={
                         action: "login",
                         id: ws.id,
+                        playersLines: playersLines
                     }
                     ws.send(JSON.stringify(msg));
 
@@ -133,12 +136,18 @@ wss.on('connection', function connection(ws, req) {
 				case "linestart":
 					if(!ws.isDrawing) return;
                     artistLastPoint = new Victor(data.x, data.y)
+
 					// Broadcast to everyone else.
 				    wss.clients.forEach(function each(client) {
 				      if (client !== ws && client.readyState === WebSocket.OPEN) {
 				        client.send(JSON.stringify(data));
 				      }
 				    });
+
+                    // Guardo local
+                    playersLines.push([]);
+                    playersLines[playersLines.length-1].push([data.x, data.y]);
+
 					break;
 				case "vertex":
 					if(!ws.isDrawing) return;
@@ -162,6 +171,9 @@ wss.on('connection', function connection(ws, req) {
                         currArtist = undefined;
                         wss.UpdateQueue();
                     }
+
+                    // guardo local
+                    playersLines[playersLines.length-1].push([data.x, data.y]);
 
 					break;
 				case "lineend":

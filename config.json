@@ -1,10 +1,1 @@
-{
-  "totalInk": 10,
-  "cadaCuantasLineasActualizo": 10,
-  "clientOptions":{
-      "videoId"     : "A5sCi312cuk",
-      "videoScale"  : 1.77,
-      "tiempoInactividadInicial" : 10,
-      "tiempoInactividadEntreLineas" : 15
-  }
-}
+{"totalInk":10,"cadaCuantasLineasActualizo":10,"clientOptions":{"videoId":"A5sCi312cuk","videoScale":1.77,"tiempoInactividadInicial":10,"tiempoInactividadEntreLineas":15}}

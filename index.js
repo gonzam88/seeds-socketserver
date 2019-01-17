@@ -4,6 +4,7 @@ const SocketServer = WebSocket.Server;
 const path = require('path');
 var Victor = require('victor');
 var SelfReloadJSON = require('self-reload-json');
+const fs = require('fs');
 
 var config = new SelfReloadJSON( path.join(__dirname, 'config.json'));
 config.on('updated', function(json) {
@@ -24,7 +25,7 @@ config.on('error', function(err) {
 })
 
 const PORT = process.env.PORT || 3000;
-const INDEX = path.join(__dirname, 'index.php');
+const INDEX = path.join(__dirname, 'index.html');
 
 const server = express()
   .use((req, res) => res.sendFile(INDEX) )
@@ -156,7 +157,18 @@ wss.on('connection', function connection(ws, req) {
                         clientOptions: config.clientOptions
                     }
                     ws.send(JSON.stringify(msg));
+                    break;
 
+                case "changeClientOptions":
+                    if(data.password != process.env.OPTIONSPASSWORD) return;
+
+                    fs.writeFile("config.json", JSON.stringify(data.config), function(err) {
+                        if(err) {
+                            return console.log(err);
+                        }
+
+                        console.log("The file was saved!");
+                    });
                     break;
 
                 case "status":

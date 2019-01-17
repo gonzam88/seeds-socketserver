@@ -3,6 +3,25 @@ const WebSocket = require('ws');
 const SocketServer = WebSocket.Server;
 const path = require('path');
 var Victor = require('victor');
+var SelfReloadJSON = require('self-reload-json');
+
+var config = new SelfReloadJSON( path.join(__dirname, 'config.json'));
+config.on('updated', function(json) {
+    console.log("config updated.");
+    // Enviando a clientes nueva configuracion
+    let msg = {
+        action: "clientOptions",
+        clientOptions: config.clientOptions
+    }
+    wss.clients.forEach(function each(client) {
+		if (client.readyState === WebSocket.OPEN) {
+			client.send(JSON.stringify(msg));
+		}
+	});
+})
+config.on('error', function(err) {
+    console.log("error cargando config")
+})
 
 const PORT = process.env.PORT || 3000;
 const INDEX = path.join(__dirname, 'index.html');
@@ -22,7 +41,6 @@ wss.getUniqueID = function () {
 };
 
 
-var totalInk = 10;
 var currInk;
 var artistLastPoint;
 
@@ -31,9 +49,10 @@ var clientPlotter;
 var currArtist;
 
 var playersLines = [];
-
-var cadaCuantasLineasActualizo = 10;
 var cuantasLineasVan = 0;
+
+var inactivityTimer;
+var idleTimer;
 
 function heartbeat() {
 	this.isAlive = true;
@@ -45,12 +64,21 @@ wss.UpdateQueue = function(){
 	if(playersQueue.length > 0 && (currArtist == null || currArtist == undefined)){
         // NUEVO ARTistA
         currArtist = playersQueue.shift()
-
-
         currArtist.isDrawing = true
         currArtist.send( JSON.stringify({action: "sosartista"}) )
-        currInk = totalInk;
+        currInk = config.total;
+
+        // Timer para ver si no responde. Se desactiva con la primer linea que manda
+        inactivityTimer = setTimeout(function(){
+            // Pasó mucho tiempo. Proximo ARTistA
+            currArtist.send(JSON.stringify({action : "stopartista", reason: "Inactivity timeout"}));
+            console.log(currArtist.nickname + " fue salteado por inactivdad")
+            currArtist = undefined;
+            wss.UpdateQueue();
+            // Enviarle un aviso o algo asi
+        }, 1000 * config.clientOptions.tiempoInactividadInicial)
 	}
+
 	// data vacia
 	let msg = {
 		action 		: "queuelist",
@@ -104,7 +132,9 @@ wss.on('connection', function connection(ws, req) {
                     msg ={
                         action: "login",
                         id: ws.id,
-                        playersLines: playersLines
+                        playersLines: playersLines,
+                        totalInk: config.total,
+                        clientOptions: config.clientOptions
                     }
                     ws.send(JSON.stringify(msg));
 
@@ -141,6 +171,9 @@ wss.on('connection', function connection(ws, req) {
 
 				case "linestart":
 					if(!ws.isDrawing) return;
+                    clearTimeout(inactivityTimer); // desactivo timeout por inactividad
+                    clearTimeout(idleTimer); // desactivo timeout por inactividad
+
                     artistLastPoint = new Victor(data.x, data.y)
 
 					// Broadcast to everyone else.
@@ -191,23 +224,29 @@ wss.on('connection', function connection(ws, req) {
 				      }
 				    });
 
-					// ws.isDrawing = false;
-					// currArtist = undefined;
-					// wss.UpdateQueue();
+                    idleTimer = setTimeout(function(){
+                        // Pasó mucho tiempo. Proximo ARTistA
+                        currArtist.send(JSON.stringify({action : "stopartista", reason: "Idle timeout"}));
+                        console.log(currArtist.nickname + " fue salteado por inactivdad")
+                        currArtist = undefined;
+                        wss.UpdateQueue();
+                        // Enviarle un aviso o algo asi
+                    }, 1000 * config.clientOptions.tiempoInactividadEntreLineas)
+
 					break;
                 case "lastVertexDone":
                     // El plotter me avisa que hizo la ultima linea que le mande
                     if(playersLines.length > 0 ){
                         let res = playersLines[0].shift(); // Borro el primer punto que haya
-                        if(res === undefined) playersLines.shift(); // Si ya no quedan puntos, borro el container de linea
+                        if(res === undefined && playersLines.length > 0) playersLines.shift(); // Si ya no quedan puntos, borro el container de linea
 
 
                         cuantasLineasVan++;
-                        if(cuantasLineasVan == cadaCuantasLineasActualizo){
+                        if(cuantasLineasVan == config.cadaCuantasLineasActualizo){
                             cuantasLineasVan = 0;
                             msg ={
                                 action: "borrarLineas",
-                                cuantas: cadaCuantasLineasActualizo
+                                cuantas: config.cadaCuantasLineasActualizo
                             }
                             wss.clients.forEach(function each(client) {
         				      if (client.role !== "plottersecreto" && client.readyState === WebSocket.OPEN) {

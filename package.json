@@ -18,7 +18,9 @@
   "homepage": "https://github.com/gonzam88/seeds-socketserver#readme",
   "dependencies": {
     "express": "^4.16.4",
+    "nconf": "^0.10.0",
     "path": "^0.12.7",
+    "self-reload-json": "^0.4.0",
     "victor": "^1.1.0",
     "ws": "^6.1.2"
   }

@@ -1,7 +1,11 @@
 {
-    "foo": "barrimientos",
-    "colors": {
-        "tree": "green",
-        "sky": "blue"
-    }
+  "totalInk": 10,
+  "cadaCuantasLineasActualizo": 10,
+  "clientOptions":{
+      "videoId"     : "dKmJgVRSvk0",
+      "videoScale"  : 1,
+      "tiempoInactividadInicial" : 5,
+      "tiempoInactividadEntreLineas" : 10
+
+  }
 }

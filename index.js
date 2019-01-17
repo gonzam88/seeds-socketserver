@@ -66,11 +66,12 @@ wss.UpdateQueue = function(){
         currArtist = playersQueue.shift()
         currArtist.isDrawing = true
         currArtist.send( JSON.stringify({action: "sosartista"}) )
-        currInk = config.total;
+        currInk = config.totalInk;
 
         // Timer para ver si no responde. Se desactiva con la primer linea que manda
         inactivityTimer = setTimeout(function(){
             // Pasó mucho tiempo. Proximo ARTistA
+            if(!currArtist) return;
             currArtist.send(JSON.stringify({action : "stopartista", reason: "Inactivity timeout"}));
             console.log(currArtist.nickname + " fue salteado por inactivdad")
             currArtist = undefined;
@@ -133,8 +134,7 @@ wss.on('connection', function connection(ws, req) {
                         action: "login",
                         id: ws.id,
                         playersLines: playersLines,
-                        totalInk: config.total,
-                        clientOptions: config.clientOptions
+                        totalInk: config.totalInk
                     }
                     ws.send(JSON.stringify(msg));
 
@@ -149,6 +149,15 @@ wss.on('connection', function connection(ws, req) {
 
 					console.log("Usr Login: " + ws.nickname + " || Host: " + ws.host);
 					break;
+                case "getClientOptions":
+
+                    msg = {
+                        action: "clientOptions",
+                        clientOptions: config.clientOptions
+                    }
+                    ws.send(JSON.stringify(msg));
+
+                    break;
 
                 case "status":
                     msg = {
@@ -171,8 +180,13 @@ wss.on('connection', function connection(ws, req) {
 
 				case "linestart":
 					if(!ws.isDrawing) return;
-                    clearTimeout(inactivityTimer); // desactivo timeout por inactividad
-                    clearTimeout(idleTimer); // desactivo timeout por inactividad
+
+                    if(typeof inactivityTimer !== "undefined"){
+                      clearTimeout(inactivityTimer);
+                    }
+                    if(typeof idleTimer !== "undefined"){
+                      clearTimeout(idleTimer);
+                    }
 
                     artistLastPoint = new Victor(data.x, data.y)
 
@@ -190,6 +204,7 @@ wss.on('connection', function connection(ws, req) {
 					break;
 				case "vertex":
 					if(!ws.isDrawing) return;
+                    clearTimeout(idleTimer);
 
                     let newPoint = new Victor(data.x, data.y)
                     let dist = artistLastPoint.distance(newPoint);
@@ -226,6 +241,7 @@ wss.on('connection', function connection(ws, req) {
 
                     idleTimer = setTimeout(function(){
                         // Pasó mucho tiempo. Proximo ARTistA
+                        if(!currArtist) return;
                         currArtist.send(JSON.stringify({action : "stopartista", reason: "Idle timeout"}));
                         console.log(currArtist.nickname + " fue salteado por inactivdad")
                         currArtist = undefined;

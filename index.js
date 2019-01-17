@@ -32,6 +32,9 @@ var currArtist;
 
 var playersLines = [];
 
+var cadaCuantasLineasActualizo = 10;
+var cuantasLineasVan = 0;
+
 function heartbeat() {
 	this.isAlive = true;
 }
@@ -41,7 +44,9 @@ wss.UpdateQueue = function(){
 
 	if(playersQueue.length > 0 && (currArtist == null || currArtist == undefined)){
         // NUEVO ARTistA
-		currArtist = playersQueue.shift();
+        currArtist = playersQueue.shift()
+
+
         currArtist.isDrawing = true
         currArtist.send( JSON.stringify({action: "sosartista"}) )
         currInk = totalInk;
@@ -57,6 +62,7 @@ wss.UpdateQueue = function(){
         msg.artist = [currArtist.nickname, currArtist.id];
     }
 	for(let i = 0; i < playersQueue.length; i++){
+        if(playersQueue[i].role == "plottersecreto") continue;
 		msg.players.push([
 			playersQueue[i].nickname,
 			playersQueue[i].id
@@ -189,6 +195,28 @@ wss.on('connection', function connection(ws, req) {
 					// currArtist = undefined;
 					// wss.UpdateQueue();
 					break;
+                case "lastVertexDone":
+                    // El plotter me avisa que hizo la ultima linea que le mande
+                    if(playersLines.length > 0 ){
+                        let res = playersLines[0].shift(); // Borro el primer punto que haya
+                        if(res === undefined) playersLines.shift(); // Si ya no quedan puntos, borro el container de linea
+
+
+                        cuantasLineasVan++;
+                        if(cuantasLineasVan == cadaCuantasLineasActualizo){
+                            cuantasLineasVan = 0;
+                            msg ={
+                                action: "borrarLineas",
+                                cuantas: cadaCuantasLineasActualizo
+                            }
+                            wss.clients.forEach(function each(client) {
+        				      if (client.role !== "plottersecreto" && client.readyState === WebSocket.OPEN) {
+        				        client.send(JSON.stringify(msg));
+        				      }
+        				    });
+                        }
+                    }
+                    break;
 			}
 		}
 	});

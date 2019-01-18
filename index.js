@@ -176,7 +176,7 @@ wss.on('connection', function connection(ws, req) {
                     break;
 
                 case "changeClientOptions":
-                    //if(typeof data.password == "undefined" || data.password !== process.env.OPTIONSPASSWORD) {console.log("contraseña incorrecta"); return;}
+                    if(typeof data.password == "undefined" || data.password !== process.env.OPTIONSPASSWORD) {console.log("contraseña incorrecta"); return;}
                     fs.writeFile("config.json", JSON.stringify(data.config, undefined, 4), function(err) {
                         if(err) {
                             return console.log(err);
@@ -185,7 +185,7 @@ wss.on('connection', function connection(ws, req) {
                     });
                     break;
                 case "saltearArtista":
-                    //if(typeof data.password == "undefined" || data.password !== process.env.OPTIONSPASSWORD) {console.log("contraseña incorrecta"); return;}
+                    if(typeof data.password == "undefined" || data.password !== process.env.OPTIONSPASSWORD) {console.log("contraseña incorrecta"); return;}
                     currArtist.isDrawing = false;
                     currArtist.send(JSON.stringify({action:"stopartista"}))
                     currArtist = undefined;
@@ -194,7 +194,7 @@ wss.on('connection', function connection(ws, req) {
 
                     break;
                 case "borrarDibujo":
-                    //if(typeof data.password == "undefined" || data.password !== process.env.OPTIONSPASSWORD) {console.log("contraseña incorrecta"); return;}
+                    if(typeof data.password == "undefined" || data.password !== process.env.OPTIONSPASSWORD) {console.log("contraseña incorrecta"); return;}
                     // LEs mando a todo que borren el dibujo
                     wss.clients.forEach(function each(client) {
                       if (client.role !== "plottersecreto" && client.readyState === WebSocket.OPEN) {

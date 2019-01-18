@@ -1,1 +1,9 @@
-{"totalInk":2,"cadaCuantasLineasActualizo":10,"clientOptions":{"videoId":"04SbNjgGHT8","videoScale":1.77,"tiempoInactividadInicial":10,"tiempoInactividadEntreLineas":15, "tiempoTotalArtista":120}}
+{
+    "totalInk":2,
+    "cadaCuantasLineasActualizo":10,
+    "videoId":"04SbNjgGHT8",
+    "videoScale":1.77,
+    "tiempoInactividadInicial":10,
+    "tiempoInactividadEntreLineas":15,
+    "tiempoTotalArtista":120
+}

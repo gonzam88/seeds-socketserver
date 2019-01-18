@@ -1,3 +1,4 @@
+
 const express = require('express');
 const WebSocket = require('ws');
 const SocketServer = WebSocket.Server;
@@ -12,7 +13,7 @@ config.on('updated', function(json) {
     // Enviando a clientes nueva configuracion
     let msg = {
         action: "clientOptions",
-        clientOptions: config.clientOptions
+        clientOptions: config
     }
     wss.clients.forEach(function each(client) {
 		if (client.readyState === WebSocket.OPEN) {
@@ -79,7 +80,7 @@ wss.UpdateQueue = function(){
             currArtist.isDrawing = false;
             currArtist = undefined;
             wss.UpdateQueue();
-        }, 1000 * config.clientOptions.tiempoTotalArtista)
+        }, 1000 * config.tiempoTotalArtista)
 
         // Timer para ver si no responde. Se desactiva con la primer linea que manda
         inactivityTimer = setTimeout(function(){
@@ -91,14 +92,15 @@ wss.UpdateQueue = function(){
             currArtist = undefined;
             wss.UpdateQueue();
             // Enviarle un aviso o algo asi
-        }, 1000 * config.clientOptions.tiempoInactividadInicial)
+        }, 1000 * config.tiempoInactividadInicial)
 	}
 
 	// data vacia
 	let msg = {
 		action 		: "queuelist",
 		players 	: [],
-		artist 		: ""
+		artist 		: "",
+        totalConnections: wss.clients.size
 	};
 	// cargo msg
     if(currArtist){
@@ -155,7 +157,9 @@ wss.on('connection', function connection(ws, req) {
 					if(ws.role == "plottersecreto"){
 						clientPlotter = ws;
 
-					}else {
+					}else if(ws.role == "panel"){
+                        // nothing
+                    }else {
 						ws.isDrawing = false;
 						playersQueue.push(ws);
 						wss.UpdateQueue();
@@ -164,43 +168,37 @@ wss.on('connection', function connection(ws, req) {
 					console.log("Usr Login: " + ws.nickname + " || Host: " + ws.host);
 					break;
                 case "getClientOptions":
-
                     msg = {
                         action: "clientOptions",
-                        clientOptions: config.clientOptions
-                    }
+                        clientOptions: config
+                    };
                     ws.send(JSON.stringify(msg));
                     break;
 
                 case "changeClientOptions":
-                    if(data.password != process.env.OPTIONSPASSWORD) return;
-
-                    fs.writeFile("config.json", JSON.stringify(data.config), function(err) {
+                    //if(typeof data.password == "undefined" || data.password !== process.env.OPTIONSPASSWORD) {console.log("contraseña incorrecta"); return;}
+                    fs.writeFile("config.json", JSON.stringify(data.config, undefined, 4), function(err) {
                         if(err) {
                             return console.log(err);
                         }
-
                         console.log("The file was saved!");
                     });
                     break;
                 case "saltearArtista":
-                    if(data.password != process.env.OPTIONSPASSWORD) return;
+                    //if(typeof data.password == "undefined" || data.password !== process.env.OPTIONSPASSWORD) {console.log("contraseña incorrecta"); return;}
                     currArtist.isDrawing = false;
+                    currArtist.send(JSON.stringify({action:"stopartista"}))
                     currArtist = undefined;
                     console.log("El artista fue salteado");
                     wss.UpdateQueue();
-                    
+
                     break;
                 case "borrarDibujo":
-                    if(data.password != process.env.OPTIONSPASSWORD) return;
+                    //if(typeof data.password == "undefined" || data.password !== process.env.OPTIONSPASSWORD) {console.log("contraseña incorrecta"); return;}
                     // LEs mando a todo que borren el dibujo
-                    msg ={
-                        action: "borrarLineas",
-                        cuantas: playersLines.length
-                    }
                     wss.clients.forEach(function each(client) {
                       if (client.role !== "plottersecreto" && client.readyState === WebSocket.OPEN) {
-                        client.send(JSON.stringify(msg));
+                        client.send(JSON.stringify({action: "borrarDibujo"}));
                       }
                     });
                     // Reseteo la variable
@@ -218,7 +216,8 @@ wss.on('connection', function connection(ws, req) {
                     msg = {
                         action: "queuelist",
                         players: [],
-                        artist: ""
+                        artist: "",
+                        totalConnections: wss.clients.size
                     }
 
                     if(currArtist){
@@ -303,7 +302,7 @@ wss.on('connection', function connection(ws, req) {
                         currArtist = undefined;
                         wss.UpdateQueue();
                         // Enviarle un aviso o algo asi
-                    }, 1000 * config.clientOptions.tiempoInactividadEntreLineas)
+                    }, 1000 * config.tiempoInactividadEntreLineas)
 
 					break;
                 case "lastVertexDone":
@@ -357,8 +356,7 @@ function noop() {}
 const interval = setInterval(function ping() {
   wss.clients.forEach(function each(ws) {
     if (ws.isAlive === false) return ws.terminate();
-
     ws.isAlive = false;
     ws.ping(noop);
   });
-}, 30000);
+}, 5000);

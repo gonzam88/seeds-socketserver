@@ -54,6 +54,7 @@ var cuantasLineasVan = 0;
 
 var inactivityTimer;
 var idleTimer;
+var artistOverallTimer;
 
 function heartbeat() {
 	this.isAlive = true;
@@ -69,12 +70,24 @@ wss.UpdateQueue = function(){
         currArtist.send( JSON.stringify({action: "sosartista"}) )
         currInk = config.totalInk;
 
+        clearTimeout(artistOverallTimer);
+        artistOverallTimer = setTimeout(function(){
+            // Pasó mucho tiempo. Proximo ARTistA
+            if(!currArtist) return;
+            currArtist.send(JSON.stringify({action : "stopartista", reason: "Inactivity timeout"}));
+            console.log(currArtist.nickname + " fue salteado. Se le termino el tiempo total")
+            currArtist.isDrawing = false;
+            currArtist = undefined;
+            wss.UpdateQueue();
+        }, 1000 * config.clientOptions.tiempoTotalArtista)
+
         // Timer para ver si no responde. Se desactiva con la primer linea que manda
         inactivityTimer = setTimeout(function(){
             // Pasó mucho tiempo. Proximo ARTistA
             if(!currArtist) return;
             currArtist.send(JSON.stringify({action : "stopartista", reason: "Inactivity timeout"}));
             console.log(currArtist.nickname + " fue salteado por inactivdad")
+            currArtist.isDrawing = false;
             currArtist = undefined;
             wss.UpdateQueue();
             // Enviarle un aviso o algo asi
@@ -170,6 +183,14 @@ wss.on('connection', function connection(ws, req) {
                         console.log("The file was saved!");
                     });
                     break;
+                case "saltearArtista":
+                    if(data.password != process.env.OPTIONSPASSWORD) return;
+                    currArtist.isDrawing = false;
+                    currArtist = undefined;
+                    console.log("El artista fue salteado");
+                    wss.UpdateQueue();
+                    
+                    break;
                 case "borrarDibujo":
                     if(data.password != process.env.OPTIONSPASSWORD) return;
                     // LEs mando a todo que borren el dibujo
@@ -184,6 +205,13 @@ wss.on('connection', function connection(ws, req) {
                     });
                     // Reseteo la variable
                     playersLines = [];
+                    break;
+                case "terminarDibujo":
+                    if(!ws.isDrawing) return;
+                    ws.isDrawing = false;
+                    currArtist = undefined;
+                    wss.UpdateQueue();
+                    console.log(ws.nickname + " terminó su dibujo");
                     break;
 
                 case "status":
@@ -271,6 +299,7 @@ wss.on('connection', function connection(ws, req) {
                         if(!currArtist) return;
                         currArtist.send(JSON.stringify({action : "stopartista", reason: "Idle timeout"}));
                         console.log(currArtist.nickname + " fue salteado por inactivdad")
+                        currArtist.isDrawing = false;
                         currArtist = undefined;
                         wss.UpdateQueue();
                         // Enviarle un aviso o algo asi
@@ -303,13 +332,14 @@ wss.on('connection', function connection(ws, req) {
 		}
 	});
 
+
 	ws.on('close', function connection(client) {
 		// cliente comun
 		if(ws.isDrawing){
 			ws.isDrawing = false;
 			currArtist = undefined;
 		}else{
-			for(let i=0; i < playersQueue.length; i++){
+			for(let i = 0; i < playersQueue.length; i++){
                 if(ws.id == playersQueue[i].id){
                     // Lo saco de la queue
                     playersQueue.splice(i,1);
@@ -317,7 +347,6 @@ wss.on('connection', function connection(ws, req) {
 			}
 		}
 		wss.UpdateQueue();
-
         console.log("Conexion cerrada: " + ws.nickname);
 	});
 });

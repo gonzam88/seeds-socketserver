@@ -170,6 +170,21 @@ wss.on('connection', function connection(ws, req) {
                         console.log("The file was saved!");
                     });
                     break;
+                case "borrarDibujo":
+                    if(data.password != process.env.OPTIONSPASSWORD) return;
+                    // LEs mando a todo que borren el dibujo
+                    msg ={
+                        action: "borrarLineas",
+                        cuantas: playersLines.length
+                    }
+                    wss.clients.forEach(function each(client) {
+                      if (client.role !== "plottersecreto" && client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify(msg));
+                      }
+                    });
+                    // Reseteo la variable
+                    playersLines = [];
+                    break;
 
                 case "status":
                     msg = {

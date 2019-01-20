@@ -81,6 +81,9 @@ wss.UpdateQueue = function(){
         currInk = config.totalInk;
 
         clearTimeout(artistOverallTimer);
+        clearTimeout(inactivityTimer);
+        clearTimeout(idleTimer);
+
         artistOverallTimer = setTimeout(function(){
             // Pasó mucho tiempo. Proximo ARTistA
             if(!currArtist) return;
@@ -95,7 +98,9 @@ wss.UpdateQueue = function(){
         inactivityTimer = setTimeout(function(){
             // Pasó mucho tiempo. Proximo ARTistA
             if(!currArtist) return;
-            currArtist.send(JSON.stringify({action : "stopartista", reason: "Inactivity timeout"}));
+            if(currArtist.readyState === WebSocket.OPEN){
+                currArtist.send(JSON.stringify({action : "stopartista", reason: "Inactivity timeout"}));
+            }
             console.log(currArtist.nickname + " fue salteado por inactivdad")
             currArtist.isDrawing = false;
             currArtist = undefined;
@@ -146,10 +151,8 @@ wss.on('connection', function connection(ws, req) {
 	        // Mensaje Json
 	        var data = JSON.parse(message);
             let msg;
-	        // console.log("Msj Json: ");
-	        // console.log(data);
+            console.log(data)
 	        switch (data.action) {
-
 				case "login":
 					ws.nickname = data.nickname;
 					ws.role = data.role;
@@ -212,6 +215,7 @@ wss.on('connection', function connection(ws, req) {
                     });
                     // Reseteo la variable
                     playersLines = [];
+                    playersLines.push([]);
                     break;
                 case "terminarDibujo":
                     if(!ws.isDrawing) return;
@@ -250,7 +254,6 @@ wss.on('connection', function connection(ws, req) {
                     if(typeof idleTimer !== "undefined"){
                       clearTimeout(idleTimer);
                     }
-
                     artistLastPoint = new Victor(data.x, data.y)
 
 					// Broadcast to everyone else.
@@ -272,6 +275,7 @@ wss.on('connection', function connection(ws, req) {
                     let newPoint = new Victor(data.x, data.y)
                     let dist = artistLastPoint.distance(newPoint);
                     currInk -= dist;
+
                     artistLastPoint = newPoint;
                     data.ink = currInk;
 

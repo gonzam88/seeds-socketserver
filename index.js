@@ -17,6 +17,8 @@ catch (e) {
 
 
 var config = new SelfReloadJSON( path.join(__dirname, 'config.json'));
+config.isServerOpen = true;
+
 config.on('updated', function(json) {
     console.log("config updated.");
     // Enviando a clientes nueva configuracion

@@ -153,7 +153,7 @@ wss.on('connection', function connection(ws, req) {
 	        // Mensaje Json
 	        var data = JSON.parse(message);
             let msg;
-            console.log(data)
+            // console.log(data)
 	        switch (data.action) {
 				case "login":
 					ws.nickname = data.nickname;

@@ -73,8 +73,6 @@ function heartbeat() {
 
 // Chequeando la QUEUE
 wss.UpdateQueue = function(){
-
-
 	if(playersQueue.length > 0 && (currArtist == null || currArtist == undefined)){
         // NUEVO ARTistA
         currArtist = playersQueue.shift()
@@ -168,7 +166,7 @@ wss.on('connection', function connection(ws, req) {
 				case "login":
 					ws.nickname = data.nickname;
 					ws.role = data.role;
-                    ws.id = wss.getUniqueID();
+                    if(!ws.id) ws.id = wss.getUniqueID();
 
                     msg ={
                         action: "login",
@@ -191,9 +189,8 @@ wss.on('connection', function connection(ws, req) {
                     }else if(ws.role == "player"){
 						ws.isDrawing = false;
 						playersQueue.push(ws);
-						wss.UpdateQueue();
 					}
-
+                    wss.UpdateQueue();
 					console.log("Usr Login: " + ws.nickname + " || Host: " + ws.host);
 					break;
                 case "getClientOptions":

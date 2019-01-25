@@ -1,4 +1,3 @@
-
 const express = require('express');
 const WebSocket = require('ws');
 const SocketServer = WebSocket.Server;
@@ -75,6 +74,7 @@ function heartbeat() {
 // Chequeando la QUEUE
 wss.UpdateQueue = function(){
 
+
 	if(playersQueue.length > 0 && (currArtist == null || currArtist == undefined)){
         // NUEVO ARTistA
         currArtist = playersQueue.shift()
@@ -130,11 +130,21 @@ wss.UpdateQueue = function(){
 		])
 	}
 	// le mando a todos la nueva cola
+    var activePlotters = [];
+
 	wss.clients.forEach(function each(client) {
 		if (client.readyState === WebSocket.OPEN) {
 			client.send(JSON.stringify(msg));
 		}
+        if(client.role == "plottersecreto") activePlotters.push(client); // Agrego a todos los plotters a este array;
 	});
+
+    if(activePlotters.length > 1){
+        for(let i = 0; i < activePlotters.length-1; i++){
+            console.log("Cerrando plotters de mas");
+            activePlotters[i].close(); // Si hay más de un plotter activo lo cierri
+        }
+    }
 }
 
 wss.on('connection', function connection(ws, req) {
@@ -169,11 +179,16 @@ wss.on('connection', function connection(ws, req) {
                     ws.send(JSON.stringify(msg));
 
 					if(ws.role == "plottersecreto"){
+                        if(clientPlotter !== undefined){
+                            console.log("Se detecto un plotter duplicado. Cerrando el anterior")
+                            clientPlotter.close();
+                        }
+                        ws.isPlotter = true;
 						clientPlotter = ws;
 
 					}else if(ws.role == "panel"){
                         // nothing
-                    }else {
+                    }else if(ws.role == "player"){
 						ws.isDrawing = false;
 						playersQueue.push(ws);
 						wss.UpdateQueue();
@@ -360,6 +375,7 @@ wss.on('connection', function connection(ws, req) {
                 }
 			}
 		}
+        if(ws.isPlotter) clientPlotter = undefined;
 		wss.UpdateQueue();
         console.log("Conexion cerrada: " + ws.nickname);
 	});
